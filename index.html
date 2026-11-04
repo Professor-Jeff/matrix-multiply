@@ -159,6 +159,17 @@
   #talkTimer.warn { color: #d97706; }
   #talkTimer.over { color: #dc2626; }
   @media (max-width: 700px) { #talkTimer { display: none; } }
+  /* presenter key points in the right margin: down arrow reveals the next one, up arrow hides it (desktop only) */
+  #keyPoints { position: fixed; top: 64px; right: 24px; width: min(360px, calc((100vw - 932px) / 2 - 40px)); z-index: 15; display: none; }
+  /* wide screens: the points live in the empty right margin; narrower desktops: the content slides left to make room */
+  @media (min-width: 1580px) { #keyPoints { display: block; } }
+  @media (min-width: 700px) and (max-width: 1579px) { body.hasPoints #keyPoints { display: block; width: 300px; } body.hasPoints .wrap { margin-right: 340px; } }
+  #keyPoints h3 { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; opacity: 0; transition: opacity .4s; }
+  body.hasPoints #keyPoints h3 { opacity: 1; }
+  #keyPoints ol { list-style: none; margin: 0; padding: 0; counter-reset: kp; }
+  #keyPoints li { opacity: 0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease; margin: 0 0 12px; padding: 12px 14px 12px 46px; position: relative; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; font-size: 1.02rem; line-height: 1.45; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  #keyPoints li::before { counter-increment: kp; content: counter(kp); position: absolute; left: 14px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700; text-align: center; line-height: 22px; }
+  #keyPoints li.show { opacity: 1; transform: none; }
 </style>
 </head>
 <body>
@@ -264,6 +275,15 @@
   <nav class="series bottom" aria-label="Neural network demo series"><a href="https://professor-jeff.github.io/pick-activity/" title="Previous demo in the series">← Previous: Pick Activity</a><span>Part 3 of 6 · neural network demos</span><a href="https://professor-jeff.github.io/tictactoe-nn/" title="Next demo in the series">Next: Tic-Tac-Toe →</a></nav>
 </div>
 
+<aside id="keyPoints" aria-label="Key points">
+  <h3>Key points</h3>
+  <ol>
+    <li>Matrix multiplication is one move repeated: take a row and a column, <b>multiply the pairs, add them up</b>. That is a dot product, and every cell of the answer is one.</li>
+    <li>Layer 1 does it <b>eight times</b>, once per hidden neuron. Layer 2 does it <b>five times</b>, once per activity. Add the bias, then ReLU or softmax, and that is the whole network.</li>
+    <li>The <b>shape rule</b> says why it fits: inner numbers must match, outer numbers give the answer. (1×2)·(2×8) = (1×8), then (1×8)·(8×5) = (1×5).</li>
+    <li>Training never touches these two lines of arithmetic. It only changes the <b>56 numbers</b> inside W1 and W2, which is why the previous page could learn without anyone writing rules.</li>
+  </ol>
+</aside>
 <button id="qrBtn" type="button" aria-expanded="false" aria-controls="qrPanel">Show QR code</button>
 <div id="qrPanel" role="dialog" aria-label="QR code for this page">
   <div class="qrTitle">Scan to try it</div>
@@ -655,6 +675,25 @@ document.addEventListener("keydown", e => {
   const a = nav.querySelector(e.key === "ArrowRight" ? 'a[title^="Next"]' : 'a[title^="Previous"], a[title^="Back"]');
   if (a) { e.preventDefault(); location.href = a.href; }
 });
+</script>
+<script>
+// Presenter key points: down arrow reveals the next one in the right margin, up arrow hides the last (desktop only)
+(() => {
+  const kp = document.getElementById("keyPoints"); if (!kp) return;
+  const items = [...kp.querySelectorAll("li")]; let shown = 0;
+  const sync = () => { items.forEach((li, i) => li.classList.toggle("show", i < shown)); document.body.classList.toggle("hasPoints", shown > 0); };
+  document.addEventListener("keydown", e => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const t = e.target, tag = t && t.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+    if (document.querySelector("dialog[open]")) return;
+    if (innerWidth < 700) return;
+    e.preventDefault();
+    shown = Math.max(0, Math.min(items.length, shown + (e.key === "ArrowDown" ? 1 : -1)));
+    sync();
+  });
+})();
 </script>
 </body>
 </html>
