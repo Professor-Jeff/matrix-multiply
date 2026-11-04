@@ -170,6 +170,10 @@
   #keyPoints li { opacity: 0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease; margin: 0 0 12px; padding: 12px 14px 12px 46px; position: relative; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; font-size: 1.02rem; line-height: 1.45; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
   #keyPoints li::before { counter-increment: kp; content: counter(kp); position: absolute; left: 14px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .8rem; font-weight: 700; text-align: center; line-height: 22px; }
   #keyPoints li.show { opacity: 1; transform: none; }
+  /* nudge toward the key points until the first one is revealed (desktop only) */
+  #kpHint { position: fixed; top: 32px; right: 16px; z-index: 15; font-size: .8rem; color: var(--muted); background: rgba(255,255,255,.8); border: 1px dashed var(--line); border-radius: 999px; padding: 4px 11px; display: none; transition: opacity .4s; pointer-events: none; }
+  @media (min-width: 700px) { #kpHint { display: block; } }
+  body.hasPoints #kpHint { opacity: 0; }
 </style>
 </head>
 <body>
@@ -275,6 +279,7 @@
   <nav class="series bottom" aria-label="Neural network demo series"><a href="https://professor-jeff.github.io/pick-activity/" title="Previous demo in the series">← Previous: Pick Activity</a><span>Part 3 of 6 · neural network demos</span><a href="https://professor-jeff.github.io/tictactoe-nn/" title="Next demo in the series">Next: Tic-Tac-Toe →</a></nav>
 </div>
 
+<div id="kpHint" aria-hidden="true">↓ arrow down for key points</div>
 <aside id="keyPoints" aria-label="Key points">
   <h3>Key points</h3>
   <ol>
