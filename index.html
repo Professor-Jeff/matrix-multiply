@@ -48,7 +48,23 @@
   .mm .hd { color: var(--muted); font-size: .7rem; text-align: center; align-self: end; padding-bottom: 2px; }
   .mm .hd.sel { color: var(--accent); font-weight: 700; }
   .mm .hd.pick { cursor: pointer; }
+  .mm .c.w { background: #fefce8; }
   .dims { font-size: .85rem; color: var(--muted); margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+  .sw { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 700; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; }
+  .sw.x { background: #dbeafe; color: #1e3a8a; } .sw.w { background: #fef3c7; color: #78350f; } .sw.r { background: #dcfce7; color: #14532d; }
+  .shapeLine { font-size: .9rem; color: var(--muted); margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
+  .shapeLine .d { color: var(--ink); }
+  mark { background: #fde68a; color: #78350f; padding: 0 3px; border-radius: 3px; font-weight: 700; }
+  /* the cast: every matrix drawn to scale */
+  .cast { display: grid; grid-template-columns: repeat(9, auto); justify-content: space-between; align-items: start; gap: 6px 4px; margin: 12px 0 4px; }
+  .cast .member { text-align: center; max-width: 124px; justify-self: center; }
+  .cast .member .nm { font-weight: 700; margin: 6px 0 2px; }
+  .cast .member .nm .dim { color: var(--muted); font-weight: 500; font-size: .85rem; margin-left: 4px; }
+  .cast .member .desc { font-size: .78rem; color: var(--muted); line-height: 1.4; }
+  .cast .op { align-self: center; text-align: center; color: var(--muted); font-size: .8rem; line-height: 1.3; padding: 0 2px; min-width: 44px; }
+  .cast .op b { display: block; font-size: 1.3rem; color: var(--ink); }
+  .cast .blocks { margin-top: 0; }
+  @media (max-width: 700px) { .cast { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 8px; } .cast .member { max-width: 170px; } .cast .op { min-width: 60px; } }
   .dims b { color: var(--ink); }
   .legend { font-size: .85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
   .legend b { color: var(--ink); }
@@ -75,6 +91,8 @@
   .shapeBox select { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); }
   .blocks { display: inline-grid; gap: 2px; margin: 8px auto 0; }
   .blocks span { width: 14px; height: 14px; border-radius: 3px; background: #bfdbfe; display: block; }
+  .blocks.x span { background: #bfdbfe; }
+  .blocks.w span { background: #fde68a; }
   .blocks.b span { background: #fde68a; }
   .blocks.r span { background: #bbf7d0; }
   .blocks.bad span { background: #fecaca; }
@@ -94,7 +112,7 @@
   .quiz .hint { font-size: .9rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 
   /* code block */
-  .code { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.6; overflow-x: auto; }
+  .code { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.6; overflow-x: auto; white-space: pre; }
   .code .cm { color: #94a3b8; }
   .code .fn { color: #93c5fd; }
   .code .op { color: #fbbf24; }
@@ -137,6 +155,13 @@
   </div>
 
   <div class="card">
+    <h2>The cast</h2>
+    <p>Five matrices, drawn to scale, one square per number. <span class="sw x">blue</span> is the vector going in, <span class="sw w">yellow</span> is weights the network learned, <span class="sw r">green</span> is what comes out. Notice that each block is exactly as wide as the next one is tall: that is what lets them be multiplied in this order.</p>
+    <div class="cast" id="cast"></div>
+    <p class="note">The biases <b>b1</b> (1×8) and <b>b2</b> (1×5) are added after each multiplication; they are rows the same width as the result. Altogether: 16 + 40 = 56 weights and 13 biases, and the network is nothing but these numbers.</p>
+  </div>
+
+  <div class="card">
     <h2><span class="step">1</span>Multiply pairs, add them up</h2>
     <p>Every number a matrix multiplication produces is made the same way: take a row from the left matrix and a column from the right one, <b>multiply the pairs, then add the products</b>. Here is one hidden neuron, by hand. Pick any of the eight:</p>
     <div class="chips" id="chips"></div>
@@ -147,6 +172,7 @@
   <div class="card">
     <h2><span class="step">2</span>Layer 1: the same thing, eight times</h2>
     <p>Lay <b>x</b> down the left and <b>W1</b> beside it, so each x sits next to the row of W1 it multiplies. Each <b>column</b> of W1 is one hidden neuron. Tap a column: the pairs light up, and the sum lands in the box below it.</p>
+    <div class="shapeLine"><span class="sw x">x</span> <span class="d">1×2</span> &nbsp;·&nbsp; <span class="sw w">W1</span> <span class="d">2×8</span> &nbsp;→&nbsp; sums <span class="d">1×8</span> &nbsp;→ +b1, ReLU →&nbsp; <span class="sw r">h</span> <span class="d">1×8</span></div>
     <div class="mmWrap"><div class="mm" id="mm1"></div></div>
     <p class="dims"><b>x</b> is 1×2, <b>W1</b> is 2×8, so <b>x · W1</b> is 1×8: eight numbers, one per column. Add the bias row <b>b1</b> to get the sums, then apply ReLU (negative becomes 0): that last row is <b>h</b>.</p>
   </div>
@@ -154,6 +180,7 @@
   <div class="card">
     <h2><span class="step">3</span>Layer 2: eight products per cell</h2>
     <p>Now <b>h</b> is the vector and <b>W2</b> is the matrix. Same rule, but each column has eight pairs to multiply and add. The five sums are the scores; softmax turns them into the percentages you saw on the previous page.</p>
+    <div class="shapeLine"><span class="sw x">h</span> <span class="d">1×8</span> &nbsp;·&nbsp; <span class="sw w">W2</span> <span class="d">8×5</span> &nbsp;→&nbsp; scores <span class="d">1×5</span> &nbsp;→ +b2, softmax →&nbsp; <span class="sw r">y</span> <span class="d">1×5</span></div>
     <div class="mmWrap"><div class="mm" id="mm2"></div></div>
     <div class="legend" id="legend"></div>
     <p class="dims"><b>h</b> is 1×8, <b>W2</b> is 8×5, so <b>h · W2</b> is 1×5. Add <b>b2</b>, apply softmax, and the biggest of the five wins.</p>
@@ -164,12 +191,13 @@
     <h2><span class="step">4</span>The shape rule</h2>
     <p>Two matrices can only be multiplied when the <b>inner</b> numbers match: the columns of the left one equal the rows of the right one. The <b>outer</b> numbers tell you the shape of the answer. Try some shapes:</p>
     <div class="shapeRow">
-      <div class="shapeBox"><div class="nm">A</div><select id="ar_"></select> × <select id="ac_"></select><div class="blocks" id="blA"></div></div>
+      <div class="shapeBox"><div class="nm" id="nmA">A</div><select id="ar_"></select> × <select id="ac_"></select><div class="blocks" id="blA"></div></div>
       <div class="times">·</div>
-      <div class="shapeBox"><div class="nm">B</div><select id="br_"></select> × <select id="bc_"></select><div class="blocks b" id="blB"></div></div>
+      <div class="shapeBox"><div class="nm" id="nmB">B</div><select id="br_"></select> × <select id="bc_"></select><div class="blocks b" id="blB"></div></div>
       <div class="arrow">=</div>
-      <div class="shapeBox res"><div class="nm">A · B</div><div id="resDims" class="dims" style="margin:0"></div><div class="blocks r" id="blR"></div></div>
+      <div class="shapeBox res"><div class="nm" id="nmR">A · B</div><div id="resDims" class="dims" style="margin:0"></div><div class="blocks r" id="blR"></div></div>
     </div>
+    <div class="shapeLine" id="shapeEq"></div>
     <div class="verdict" id="verdict"></div>
     <div class="presets">
       <button type="button" data-shape="1,2,2,8">x · W1</button>
@@ -290,7 +318,7 @@ function renderStep2(s) {
   h += `<span class="l"></span><span class="hd">x</span>` + Array.from({ length: N_HID }, (_, q) => `<span class="hd pick ${q === j ? "sel" : ""}" data-j="${q}">h${sub(q + 1)}</span>`).join("");
   for (let i = 0; i < N_IN; i++) {
     h += `<span class="l">x${sub(i + 1)}</span>` + cell(fu(x[i]), "vec" + (true ? " sel" : ""), null);
-    for (let q = 0; q < N_HID; q++) h += cell(fs(P.W1[i][q]), "pick" + (q === j ? " sel" : ""), `j="${q}"`);
+    for (let q = 0; q < N_HID; q++) h += cell(fs(P.W1[i][q]), "pick w" + (q === j ? " sel" : ""), `j="${q}"`);
   }
   h += `<span class="l">b1</span>` + cell("", "blank");
   for (let q = 0; q < N_HID; q++) h += cell(fs(P.b1[q]), "pick" + (q === j ? " sel" : ""), `j="${q}"`);
@@ -309,7 +337,7 @@ function renderStep3(s) {
   h += `<span class="l"></span><span class="hd">h</span>` + Array.from({ length: N_OUT }, (_, q) => `<span class="hd pick ${q === k ? "sel" : ""}" data-k="${q}">y${sub(q + 1)}</span>`).join("");
   for (let j = 0; j < N_HID; j++) {
     h += `<span class="l">h${sub(j + 1)}</span>` + cell(fu(f.a1[j]), "vec sel", null);
-    for (let q = 0; q < N_OUT; q++) h += cell(fs(P.W2[j][q]), "pick" + (q === k ? " sel" : ""), `k="${q}"`);
+    for (let q = 0; q < N_OUT; q++) h += cell(fs(P.W2[j][q]), "pick w" + (q === k ? " sel" : ""), `k="${q}"`);
   }
   h += `<span class="l">b2</span>` + cell("", "blank");
   for (let q = 0; q < N_OUT; q++) h += cell(fs(P.b2[q]), "pick" + (q === k ? " sel" : ""), `k="${q}"`);
@@ -338,26 +366,68 @@ function renderStep3(s) {
 
 // --- step 4: shape rule ---------------------------------------------------------------------
 function blocks(el, rows, cols, bad) {
-  el.className = el.className.replace(" bad", "") + (bad ? " bad" : "");
+  el.classList.toggle("bad", !!bad);
   el.style.gridTemplateColumns = `repeat(${cols}, 14px)`;
   el.innerHTML = Array.from({ length: rows * cols }, () => "<span></span>").join("");
 }
+// shapes that are members of the cast get called by their real names
+const CAST_NAMES = { "1×2": "x", "2×8": "W1", "1×8": "h", "8×5": "W2", "1×5": "y" };
+const CAST_KIND  = { x: "x", h: "x", W1: "w", W2: "w", y: "r" };
+const castName = (r, c) => CAST_NAMES[`${r}×${c}`] || null;
+const tag = n => `<span class="sw ${CAST_KIND[n]}">${n}</span>`;
 function renderShapes() {
   const ar = +$("ar_").value, ac = +$("ac_").value, br = +$("br_").value, bc = +$("bc_").value;
   const ok = ac === br;
+  const nA = castName(ar, ac), nB = castName(br, bc);
+  const labA = nA ? `A = ${tag(nA)}` : "A", labB = nB ? `B = ${tag(nB)}` : "B";
+  $("nmA").innerHTML = labA; $("nmB").innerHTML = labB;
   blocks($("blA"), ar, ac, false); blocks($("blB"), br, bc, false);
+  $("blA").className = "blocks" + (nA ? " " + CAST_KIND[nA] : "");
+  $("blB").className = "blocks" + (nB ? " " + CAST_KIND[nB] : " b");
+  $("shapeEq").innerHTML = `<span class="d">${ar}×<mark>${ac}</mark></span> &nbsp;·&nbsp; <span class="d"><mark>${br}</mark>×${bc}</span> &nbsp;→&nbsp; ${ok ? `<span class="d">${ar}×${bc}</span>` : "✗"} &nbsp;&nbsp;<span style="font-size:.8rem">the two highlighted numbers must match</span>`;
   if (ok) {
     blocks($("blR"), ar, bc, false);
+    $("blR").className = "blocks r";
+    const pair = nA === "x" && nB === "W1" ? "x · W1" : nA === "h" && nB === "W2" ? "h · W2" : null;
+    $("nmR").innerHTML = pair ? `${tag(nA)} · ${tag(nB)}` : "A · B";
     $("resDims").innerHTML = `<b>${ar}×${bc}</b>`;
     $("verdict").className = "verdict ok";
-    $("verdict").textContent = `✓ Inner numbers match (${ac} = ${br}). The answer is ${ar}×${bc}: each of its ${ar * bc} cells is a sum of ${ac} products.`;
+    $("verdict").innerHTML = pair === "x · W1"
+      ? `✓ Inner numbers match (2 = 2). x · W1 is 1×8: the eight sums in step 2, which become <b>h</b> after the bias and ReLU.`
+      : pair === "h · W2"
+      ? `✓ Inner numbers match (8 = 8). h · W2 is 1×5: the five scores in step 3, which become <b>y</b> after the bias and softmax.`
+      : `✓ Inner numbers match (${ac} = ${br}). The answer is ${ar}×${bc}: each of its ${ar * bc} cells is a sum of ${ac} products.`;
   } else {
-    $("blR").innerHTML = ""; $("blR").style.gridTemplateColumns = "";
+    $("blR").innerHTML = ""; $("blR").style.gridTemplateColumns = ""; $("blR").className = "blocks r";
+    $("nmR").innerHTML = "A · B";
     $("resDims").innerHTML = `<b>—</b>`;
     $("verdict").className = "verdict no";
-    $("verdict").textContent = `✗ Can't multiply: A has ${ac} columns but B has ${br} rows, so the pairs don't line up.`;
+    $("verdict").innerHTML = nA && nB
+      ? `✗ Can't multiply ${nA} · ${nB}: ${nA} has ${ac} column${ac === 1 ? "" : "s"} but ${nB} has ${br} row${br === 1 ? "" : "s"}, so the pairs don't line up. Order matters.`
+      : `✗ Can't multiply: A has ${ac} columns but B has ${br} rows, so the pairs don't line up.`;
   }
 }
+
+// the cast strip: x · W1 → h · W2 → y, drawn to scale
+function renderCast() {
+  const member = (name, kind, r, c, desc) => {
+    const id = `cast_${name}`;
+    return `<div class="member"><div class="blocks ${kind}" id="${id}"></div><div class="nm">${name}<span class="dim">${r}×${c}</span></div><div class="desc">${desc}</div></div>`;
+  };
+  const op = (sym, txt) => `<div class="op"><b>${sym}</b>${txt}</div>`;
+  $("cast").innerHTML =
+    member("x", "x", 1, 2, "the slider values; one row = one example") +
+    op("·", "multiply") +
+    member("W1", "w", 2, 8, "16 learned weights; 8 columns = 8 hidden neurons") +
+    op("→", "+b1, ReLU") +
+    member("h", "r", 1, 8, "what the hidden neurons output") +
+    op("·", "multiply") +
+    member("W2", "w", 8, 5, "40 learned weights; 5 columns = 5 activities") +
+    op("→", "+b2, softmax") +
+    member("y", "r", 1, 5, "the five probabilities");
+  blocks($("cast_x"), 1, 2); blocks($("cast_W1"), 2, 8); blocks($("cast_h"), 1, 8); blocks($("cast_W2"), 8, 5); blocks($("cast_y"), 1, 5);
+}
+renderCast();
 
 // --- step 5: you try it ----------------------------------------------------------------------
 let quizJ = 2, streak = 0, tries = 0;
