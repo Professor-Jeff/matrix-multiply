@@ -93,6 +93,8 @@
   .ar .final { color: #14532d; }
   .ar .zero { color: var(--bad); }
   @media (max-width: 480px) { .ar { font-size: .78rem; gap: 5px 7px; } }
+  .ar { max-width: 100%; overflow-x: auto; }
+  @media (max-width: 600px) { .series { flex-wrap: wrap; } .series > span { order: 3; width: 100%; text-align: center; } }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
   .chips button { margin: 0; padding: 6px 11px; font-size: .9rem; border-radius: 999px; }
   .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -135,6 +137,11 @@
   .quiz .streak { font-size: .85rem; color: var(--muted); margin-top: 6px; }
   .quiz .hint { font-size: .9rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 
+  /* live NumPy-style box */
+  .repl input[type=text] { font: inherit; font-family: ui-monospace, Menlo, monospace; width: 100%; max-width: 560px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; display: block; }
+  .npOut { margin: 10px 0 0; background: var(--bg); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 2.4em; }
+  .npOut.ok { border-left: 3px solid var(--ok); } .npOut.err { border-left: 3px solid var(--bad); color: var(--bad); }
+  .npOut .match { color: #14532d; font-weight: 600; }
   /* code block */
   .code { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.6; overflow-x: auto; white-space: pre; }
   .code .cm { color: #94a3b8; }
@@ -268,12 +275,42 @@
     <div class="hint" id="qHint"></div>
   </div>
 
+  <div class="card quiz">
+    <h2><span class="step">6</span>You try it (again): one output</h2>
+    <p>One output needs all eight hidden values, so take <b>h</b> as given, the row step 3 produced. Pick one column of W2: multiply the eight pairs, add them, add the bias. That sum is the <b>score</b>; the page will turn the five scores into percentages.</p>
+    <div class="q" id="q2Text"></div>
+    <div class="ar" id="q2Ar"></div>
+    <div style="margin-top:10px">
+      <input type="text" id="q2In" placeholder="the score, or the whole eight-term sum" aria-label="Your answer" autocomplete="off" spellcheck="false">
+      <div class="how">Same rules as step 5. Eight products is a lot to type, so <b>Start me off</b> writes the sum with the numbers in place; check it, change it, or just run it.</div>
+      <button class="primary" id="q2Check" type="button">Check</button>
+      <button id="q2Fill" type="button">Start me off</button>
+      <button id="q2New" type="button">Another one</button>
+    </div>
+    <div class="fb" id="q2Fb"></div>
+    <div class="streak" id="q2Streak"></div>
+    <div class="hint" id="q2Hint"></div>
+  </div>
+
   <div class="card">
-    <h2>In code</h2>
+    <h2><span class="step">7</span>Run the two lines</h2>
     <p>With NumPy, <code>@</code> means matrix multiply. The whole network is these two lines, and every number on this page is one cell of them:</p>
     <div class="code"><span class="fn">h</span> <span class="op">=</span> relu(x <span class="op">@</span> W1 <span class="op">+</span> b1)        <span class="cm"># (1×2) @ (2×8) + (1×8)  →  (1×8)</span>
 <span class="fn">y</span> <span class="op">=</span> softmax(h <span class="op">@</span> W2 <span class="op">+</span> b2)     <span class="cm"># (1×8) @ (8×5) + (1×5)  →  (1×5)</span></div>
     <p class="note">Training never changes these two lines. It only changes the 56 numbers inside W1 and W2 (and the 13 biases), which is why the previous page could learn the rules without anyone writing them down.</p>
+    <p style="margin:14px 0 6px">Try them. <b>x, W1, b1, h, W2, b2</b> hold this page's numbers; <code>@</code>, <code>+</code>, <code>-</code>, <code>*</code>, <code>relu( )</code> and <code>softmax( )</code> work:</p>
+    <div class="repl">
+      <input type="text" id="npIn" placeholder="relu(x @ W1 + b1)" aria-label="NumPy-style expression" autocomplete="off" spellcheck="false">
+      <div class="presets" style="margin:6px 0 8px">
+        <button type="button" data-np="x @ W1">x @ W1</button>
+        <button type="button" data-np="relu(x @ W1 + b1)">relu(x @ W1 + b1)</button>
+        <button type="button" data-np="h @ W2 + b2">h @ W2 + b2</button>
+        <button type="button" data-np="softmax(h @ W2 + b2)">softmax(h @ W2 + b2)</button>
+        <button type="button" data-np="softmax(relu(x @ W1 + b1) @ W2 + b2)">the whole network in one line</button>
+      </div>
+      <button class="primary" id="npRun" type="button">Run</button>
+      <pre class="npOut" id="npOut">Type an expression and press Run (or Enter).</pre>
+    </div>
   </div>
 
   <nav class="series bottom" aria-label="Neural network demo series"><a href="https://professor-jeff.github.io/pick-activity/" title="Previous demo in the series">← Previous: Pick Activity</a><span>Part 3 of 5 · neural network demos</span><a href="https://professor-jeff.github.io/tictactoe-nn/" title="Next demo in the series">Next: Tic-Tac-Toe →</a></nav>
@@ -613,7 +650,8 @@ function checkQuiz() {
 function render() {
   const s = state();
   $("tempVal").textContent = `${s.temp} °F`; $("rainVal").textContent = `${s.rain} %`;
-  renderStep1(s); renderStep2(s); renderStep3(s); renderQuiz(s); litCast(s.j, s.k);
+  renderStep1(s); renderStep2(s); renderStep3(s); renderQuiz(s); renderQuiz2(s); litCast(s.j, s.k);
+  if ($("npIn").value.trim()) runNp();
 }
 $("temp").addEventListener("input", render);
 $("rain").addEventListener("input", render);
@@ -638,6 +676,150 @@ renderShapes();
 $("qCheck").addEventListener("click", checkQuiz);
 $("qIn").addEventListener("keydown", e => { if (e.key === "Enter") checkQuiz(); });
 $("qNew").addEventListener("click", newQuiz);
+
+// --- step 6: one output, with h given --------------------------------------------------------
+let quizK = 1, streak2 = 0, tries2 = 0;
+function quiz2Expected(s) {   // from the rounded numbers on screen
+  let z = r2(P.b2[quizK]);
+  for (let j = 0; j < N_HID; j++) z += r2(s.f.a1[j]) * r2(P.W2[j][quizK]);
+  return z;
+}
+function renderQuiz2(s) {
+  const k = quizK;
+  $("q2Text").innerHTML = `What is the <b>score for y${sub(k + 1)}</b> (${ACTIVITIES[k]}) right now?`;
+  let a = "";
+  for (let j = 0; j < N_HID; j++) a += `<span class="k">h${sub(j + 1)}</span><span class="eq">=</span><span class="r">${fu(s.f.a1[j])}</span><span class="k">W2[${j + 1},${k + 1}]</span><span class="r">${fs(P.W2[j][k])}</span>`;
+  a += `<span class="k">b2[${k + 1}]</span><span class="eq">=</span><span class="r">${fs(P.b2[k])}</span><span></span><span></span>`;
+  $("q2Ar").innerHTML = a;
+  $("q2Streak").textContent = streak2 ? `Streak: ${streak2} ✓` : "";
+}
+function quiz2Template(s) {
+  const k = quizK, terms = [];
+  for (let j = 0; j < N_HID; j++) terms.push(`${fu(s.f.a1[j])}*(${fs(P.W2[j][k])})`);
+  return terms.join(" + ") + ` + (${fs(P.b2[k])})`;
+}
+function newQuiz2() {
+  let k; do { k = Math.floor(Math.random() * N_OUT); } while (k === quizK);
+  quizK = k; tries2 = 0;
+  $("q2In").value = ""; $("q2Fb").textContent = ""; $("q2Fb").className = "fb"; $("q2Hint").textContent = "";
+  renderQuiz2(state()); $("q2In").focus();
+}
+function checkQuiz2() {
+  const s = state();
+  const raw = $("q2In").value.trim();
+  if (raw === "") { $("q2Fb").className = "fb no"; $("q2Fb").textContent = "Type the score, or press Start me off and run the sum."; return; }
+  let ans;
+  try { ans = evalExpr(raw); } catch (err) { $("q2Fb").className = "fb no"; $("q2Fb").textContent = `Couldn't read that: ${err.message}.`; return; }
+  const want = quiz2Expected(s), k = quizK;
+  const isNumber = /^[-−+]?\d*\.?\d+$/.test(raw);
+  const shown = isNumber ? "" : ` (your expression = ${fs(ans)})`;
+  tries2++;
+  if (Math.abs(ans - want) <= 0.05) {
+    streak2++;
+    const scores = s.f.z2.map(fs).join(", ");
+    $("q2Fb").className = "fb ok";
+    $("q2Fb").innerHTML = `✓ Correct: the score for y${sub(k + 1)} is ${fs(want)}${shown}. The five scores are ${scores}; softmax turns them into ${s.f.probs.map(p => Math.round(p * 100) + "%").join(", ")}, so <b>y${sub(k + 1)} = ${Math.round(s.f.probs[k] * 100)}%</b>.` +
+      (streak2 >= 2 ? " You have now followed a number all the way from the sliders to an answer. 🎉" : "");
+    $("q2Hint").textContent = "";
+  } else {
+    streak2 = 0;
+    $("q2Fb").className = "fb no";
+    $("q2Fb").textContent = `✗ Not quite. You said ${fs(ans)}${shown}.`;
+    $("q2Hint").innerHTML = tries2 === 1
+      ? "Eight pairs: h₁ with W2[1,k], h₂ with W2[2,k], … then add all eight products and the bias. No ReLU this time; the score can be negative."
+      : `The first two products are ${fs(r2(s.f.a1[0]) * r2(P.W2[0][k]))} and ${fs(r2(s.f.a1[1]) * r2(P.W2[1][k]))}. Press Start me off to see the whole sum written out.`;
+  }
+  $("q2Streak").textContent = streak2 ? `Streak: ${streak2} ✓` : "";
+}
+$("q2Check").addEventListener("click", checkQuiz2);
+$("q2In").addEventListener("keydown", e => { if (e.key === "Enter") checkQuiz2(); });
+$("q2New").addEventListener("click", newQuiz2);
+$("q2Fill").addEventListener("click", () => { $("q2In").value = quiz2Template(state()); $("q2In").focus(); });
+
+// --- step 7: a tiny NumPy: numbers, vectors (1×n) and matrices, with + - * / @, relu, softmax, max ----
+function evalNp(src, env) {
+  const text = src.replace(/[−–]/g, "-").replace(/[×·]/g, "*");
+  const tok = text.match(/\d*\.\d+|\d+\.?|[-+*\/@(),]|[A-Za-z_][A-Za-z0-9_]*|\S/g) || [];
+  let i = 0;
+  const peek = () => tok[i], next = () => tok[i++], fail = m => { throw new Error(m); };
+  const isNum = v => typeof v === "number", isVec = v => Array.isArray(v) && !Array.isArray(v[0]), isMat = v => Array.isArray(v) && Array.isArray(v[0]);
+  const shape = v => isNum(v) ? "a number" : isVec(v) ? `1×${v.length}` : `${v.length}×${v[0].length}`;
+  function ew(a, b, f, op) {   // elementwise with a number on either side, or same shapes
+    if (isNum(a) && isNum(b)) return f(a, b);
+    if (isNum(a)) return isVec(b) ? b.map(v => f(a, v)) : b.map(r => r.map(v => f(a, v)));
+    if (isNum(b)) return isVec(a) ? a.map(v => f(v, b)) : a.map(r => r.map(v => f(v, b)));
+    if (isVec(a) && isVec(b)) { if (a.length !== b.length) fail(`can't ${op} a ${shape(a)} and a ${shape(b)}`); return a.map((v, q) => f(v, b[q])); }
+    if (isMat(a) && isMat(b)) { if (a.length !== b.length || a[0].length !== b[0].length) fail(`can't ${op} a ${shape(a)} and a ${shape(b)}`); return a.map((r, q) => r.map((v, c) => f(v, b[q][c]))); }
+    fail(`can't ${op} a ${shape(a)} and a ${shape(b)}`);
+  }
+  function matmul(a, b) {
+    if (isNum(a) || isNum(b)) fail("@ is for a vector or matrix on each side; use * with a number");
+    const A = isVec(a) ? [a] : a, B = isVec(b) ? b.map(v => [v]) : b;
+    if (A[0].length !== B.length) fail(`shapes don't match for @: ${shape(a)} @ ${shape(b)} (inner numbers ${A[0].length} and ${B.length} differ)`);
+    const out = A.map(row => B[0].map((_, c) => row.reduce((acc, v, q) => acc + v * B[q][c], 0)));
+    if (isVec(a) && isVec(b)) return out[0][0];
+    if (isVec(a)) return out[0];
+    if (isVec(b)) return out.map(r => r[0]);
+    return out;
+  }
+  function expr() { let v = term(); while (peek() === "+" || peek() === "-") { const op = next(), r = term(); v = ew(v, r, op === "+" ? (p, q) => p + q : (p, q) => p - q, op === "+" ? "add" : "subtract"); } return v; }
+  function term() { let v = unary(); while (peek() === "*" || peek() === "/" || peek() === "@") { const op = next(), r = unary(); v = op === "@" ? matmul(v, r) : ew(v, r, op === "*" ? (p, q) => p * q : (p, q) => p / q, op === "*" ? "multiply" : "divide"); } return v; }
+  function unary() { if (peek() === "-") { next(); return ew(-1, unary(), (p, q) => p * q, "negate"); } if (peek() === "+") { next(); return unary(); } return primary(); }
+  function primary() {
+    const t = next();
+    if (t === undefined) fail("the expression ends too soon");
+    if (/^\d*\.?\d+$|^\d+\.?$/.test(t)) return parseFloat(t);
+    if (t === "(") { const v = expr(); if (next() !== ")") fail("missing a closing parenthesis"); return v; }
+    if (/^[A-Za-z_]/.test(t)) {
+      if (peek() === "(") {
+        next(); const args = [expr()]; while (peek() === ",") { next(); args.push(expr()); }
+        if (next() !== ")") fail("missing a closing parenthesis");
+        const name = t.toLowerCase(), v = args[0];
+        if (name === "relu") return isNum(v) ? Math.max(0, v) : isVec(v) ? v.map(q => Math.max(0, q)) : v.map(r => r.map(q => Math.max(0, q)));
+        if (name === "softmax") { if (!isVec(v)) fail("softmax wants a vector (one row)"); return softmax(v); }
+        if (name === "max") { if (args.length === 2 && isNum(args[0]) && !isNum(args[1])) return isVec(args[1]) ? args[1].map(q => Math.max(args[0], q)) : args[1]; if (args.every(isNum)) return Math.max(...args); if (isVec(v)) return Math.max(...v); fail("max wants numbers or one vector"); }
+        if (name === "sum") { if (isVec(v)) return v.reduce((p, q) => p + q, 0); if (isMat(v)) return v.flat().reduce((p, q) => p + q, 0); return v; }
+        fail(`I don't know the function "${t}"`);
+      }
+      if (t in env) return env[t];
+      fail(`I don't know "${t}" (try x, W1, b1, h, W2, b2)`);
+    }
+    fail(`unexpected "${t}"`);
+  }
+  const v = expr();
+  if (i < tok.length) fail(`unexpected "${tok[i]}"`);
+  return v;
+}
+function fmtNp(v) {
+  const f = n => (Math.abs(n) < 0.005 ? "0.00" : n.toFixed(2)).padStart(6);
+  if (typeof v === "number") return f(v).trim();
+  if (!Array.isArray(v[0])) return "[" + v.map(f).join(" ") + "]";
+  return "[" + v.map(r => "[" + r.map(f).join(" ") + "]").join("\n ") + "]";
+}
+function runNp() {
+  const s = state();
+  const env = { x: s.x, W1: P.W1, b1: P.b1, h: s.f.a1, W2: P.W2, b2: P.b2 };
+  const src = $("npIn").value.trim();
+  const out = $("npOut");
+  if (!src) { out.className = "npOut"; out.textContent = "Type an expression and press Run (or Enter)."; return; }
+  try {
+    const v = evalNp(src, env);
+    const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((q, idx) => Math.abs(q - b[idx]) < 0.005);
+    let note = "";
+    if (same(v, s.f.a1)) note = "  ← that is h: the ReLU row in step 2";
+    else if (same(v, s.f.z1)) note = "  ← the eight sums in step 2, before ReLU";
+    else if (same(v, s.f.z2)) note = "  ← the five scores in step 3, before softmax";
+    else if (same(v, s.f.probs)) note = "  ← that is y: " + s.f.probs.map((p, k) => `y${sub(k + 1)} ${Math.round(p * 100)}%`).join(", ") + ". Winner: " + ACTIVITIES[s.best];
+    const shape = typeof v === "number" ? "a number" : Array.isArray(v[0]) ? `${v.length}×${v[0].length}` : `1×${v.length}`;
+    out.className = "npOut ok";
+    out.innerHTML = `${fmtNp(v)}<span class="match">${note}</span>\n<span style="color:var(--muted)">shape: ${shape}</span>`;
+  } catch (err) {
+    out.className = "npOut err"; out.textContent = "Error: " + err.message;
+  }
+}
+$("npRun").addEventListener("click", runNp);
+$("npIn").addEventListener("keydown", e => { if (e.key === "Enter") runNp(); });
+document.querySelector(".repl .presets").addEventListener("click", e => { const b = e.target.closest("[data-np]"); if (b) { $("npIn").value = b.dataset.np; runNp(); } });
 
 render();
 
