@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matrix Multiplication — Inside the Network</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1c1e21; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 72px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; min-width: 0; }
+  .card h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .card h2 .step { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .8rem; line-height: 22px; text-align: center; margin-right: 8px; letter-spacing: 0; }
+  .card p { line-height: 1.5; }
+  .note { font-size: .9rem; color: var(--muted); line-height: 1.5; }
+  label { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 4px; }
+  input[type=range] { width: 100%; margin: 0 0 18px; }
+  button { font: inherit; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer; margin-right: 8px; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  .src { font-size: .85rem; padding: 8px 12px; border-radius: 8px; background: #dcfce7; color: #14532d; margin-top: 4px; line-height: 1.45; }
+  .src.baked { background: #fef3c7; color: #78350f; }
+  .src a { color: inherit; }
+
+  /* stacked matrices: the vector down the left, the matrix beside it, results underneath */
+  .mmWrap { overflow-x: auto; margin: 6px -4px; padding: 0 4px; }
+  .mm { display: grid; gap: 3px; font-family: ui-monospace, Menlo, monospace; font-size: clamp(.56rem, 2.4vw, .8rem); margin: 6px 0; }
+  .mm .c { background: var(--bg); padding: 5px 1px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; border: 1px solid transparent; min-width: 26px; white-space: nowrap; }
+  @media (max-width: 480px) { .mm { gap: 2px; } .mm .l { font-size: .62rem; padding-right: 3px; } .mm .hd { font-size: .62rem; } }
+  .mm .c.pick { cursor: pointer; }
+  .mm .c.pick:hover { border-color: var(--muted); }
+  .mm .c.vec { background: #eff6ff; color: #1e3a8a; }
+  .mm .c.sel { background: #dbeafe; border-color: var(--accent); color: #1e3a8a; font-weight: 700; }
+  .mm .c.out { background: #ecfdf5; }
+  .mm .c.out.sel { background: #bbf7d0; border-color: var(--ok); color: #14532d; }
+  .mm .c.win { outline: 2px solid var(--ok); }
+  .mm .c.blank { background: none; }
+  .mm .l { color: var(--muted); font-size: .7rem; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; white-space: nowrap; }
+  .mm .hd { color: var(--muted); font-size: .7rem; text-align: center; align-self: end; padding-bottom: 2px; }
+  .mm .hd.sel { color: var(--accent); font-weight: 700; }
+  .mm .hd.pick { cursor: pointer; }
+  .dims { font-size: .85rem; color: var(--muted); margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+  .dims b { color: var(--ink); }
+  .legend { font-size: .85rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .legend b { color: var(--ink); }
+  .legend .w { color: var(--ok); }
+
+  /* the arithmetic, written out */
+  .ar { display: grid; grid-template-columns: max-content max-content max-content max-content max-content; gap: 5px 10px; font-family: ui-monospace, Menlo, monospace; font-size: .9rem; align-items: baseline; margin: 10px 0 4px; font-variant-numeric: tabular-nums; }
+  .ar .k { color: var(--muted); }
+  .ar .eq { color: var(--muted); }
+  .ar .r { font-weight: 700; text-align: right; }
+  .ar .rule { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 2px 0; }
+  .ar .final { color: #14532d; }
+  .ar .zero { color: var(--bad); }
+  @media (max-width: 480px) { .ar { font-size: .78rem; gap: 5px 7px; } }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .chips button { margin: 0; padding: 6px 11px; font-size: .9rem; border-radius: 999px; }
+  .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* shape toy */
+  .shapeRow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; margin: 10px 0; }
+  .shapeRow .times, .shapeRow .arrow { text-align: center; font-size: 1.4rem; color: var(--muted); }
+  .shapeBox { text-align: center; }
+  .shapeBox .nm { font-weight: 700; margin-bottom: 6px; }
+  .shapeBox select { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); }
+  .blocks { display: inline-grid; gap: 2px; margin: 8px auto 0; }
+  .blocks span { width: 14px; height: 14px; border-radius: 3px; background: #bfdbfe; display: block; }
+  .blocks.b span { background: #fde68a; }
+  .blocks.r span { background: #bbf7d0; }
+  .blocks.bad span { background: #fecaca; }
+  .verdict { margin-top: 8px; font-weight: 600; min-height: 1.5em; }
+  .verdict.ok { color: var(--ok); }
+  .verdict.no { color: var(--bad); }
+  .presets button { padding: 6px 11px; font-size: .9rem; margin: 4px 6px 0 0; }
+  @media (max-width: 480px) { .shapeRow { grid-template-columns: 1fr auto 1fr; } .shapeRow .arrow { grid-column: 1 / -1; } .shapeRow .res { grid-column: 1 / -1; } }
+
+  /* you try it */
+  .quiz .q { font-size: 1.05rem; margin: 6px 0 10px; }
+  .quiz input[type=text] { font: inherit; font-family: ui-monospace, Menlo, monospace; width: 110px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .quiz .fb { min-height: 1.6em; margin-top: 10px; font-weight: 600; }
+  .quiz .fb.ok { color: var(--ok); }
+  .quiz .fb.no { color: var(--bad); }
+  .quiz .streak { font-size: .85rem; color: var(--muted); margin-top: 6px; }
+  .quiz .hint { font-size: .9rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+  /* code block */
+  .code { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; line-height: 1.6; overflow-x: auto; }
+  .code .cm { color: #94a3b8; }
+  .code .fn { color: #93c5fd; }
+  .code .op { color: #fbbf24; }
+
+  /* QR code for presentations (lower left) */
+  #qrBtn { position: fixed; left: 16px; bottom: 16px; z-index: 20; margin: 0; font-size: .85rem; padding: 8px 14px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  #qrPanel { position: fixed; left: 16px; bottom: 64px; z-index: 20; display: none; flex-direction: column; align-items: center; gap: 8px; padding: 16px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+  #qrPanel.open { display: flex; }
+  #qrPanel .qrTitle { font-size: 1rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  #qrPanel svg { width: 220px; height: 220px; border: 8px solid #fff; background: #fff; display: block; }
+  #qrPanel .qrUrl { font-size: .85rem; color: var(--muted); letter-spacing: .03em; }
+  @media (max-width: 700px) { #qrPanel svg { width: 160px; height: 160px; } }
+  /* previous / next links through the demo series */
+  .series { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: .9rem; color: var(--muted); margin: 0 0 14px; }
+  .series a { color: var(--accent); text-decoration: none; font-weight: 600; white-space: nowrap; }
+  .series a:hover, .series a:focus-visible { text-decoration: underline; }
+  .series.bottom { margin: 24px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="series" aria-label="Neural network demo series"><a href="https://professor-jeff.github.io/pick-activity/" title="Previous demo in the series">← Previous: Pick Activity</a><span>Part 3 of 6 · neural network demos</span><a href="https://professor-jeff.github.io/tictactoe-nn/" title="Next demo in the series">Next: Tic-Tac-Toe →</a></nav>
+  <h1>Matrix multiplication: the arithmetic inside the network</h1>
+  <p class="sub">The network on the previous page is two matrix multiplications and nothing else. Here is what that means, one number at a time, with the same names and the same 56 weights.</p>
+
+  <div class="card">
+    <h2>Inputs</h2>
+    <div class="grid">
+      <div>
+        <label>Temperature <span id="tempVal">72 °F</span></label>
+        <input type="range" id="temp" min="0" max="100" value="72">
+      </div>
+      <div>
+        <label>Chance of rain <span id="rainVal">20 %</span></label>
+        <input type="range" id="rain" min="0" max="100" value="20">
+      </div>
+    </div>
+    <p class="note" style="margin:0 0 8px">The sliders become the two inputs, scaled to 0–1: <b>x₁ = temperature ÷ 100</b> and <b>x₂ = rain ÷ 100</b>. Together they are a matrix with 1 row and 2 columns, written <b>x</b>.</p>
+    <div class="src" id="src"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">1</span>Multiply pairs, add them up</h2>
+    <p>Every number a matrix multiplication produces is made the same way: take a row from the left matrix and a column from the right one, <b>multiply the pairs, then add the products</b>. Here is one hidden neuron, by hand. Pick any of the eight:</p>
+    <div class="chips" id="chips"></div>
+    <div class="ar" id="ar1"></div>
+    <p class="note" id="ar1Note"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Layer 1: the same thing, eight times</h2>
+    <p>Lay <b>x</b> down the left and <b>W1</b> beside it, so each x sits next to the row of W1 it multiplies. Each <b>column</b> of W1 is one hidden neuron. Tap a column: the pairs light up, and the sum lands in the box below it.</p>
+    <div class="mmWrap"><div class="mm" id="mm1"></div></div>
+    <p class="dims"><b>x</b> is 1×2, <b>W1</b> is 2×8, so <b>x · W1</b> is 1×8: eight numbers, one per column. Add the bias row <b>b1</b> to get the sums, then apply ReLU (negative becomes 0): that last row is <b>h</b>.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>Layer 2: eight products per cell</h2>
+    <p>Now <b>h</b> is the vector and <b>W2</b> is the matrix. Same rule, but each column has eight pairs to multiply and add. The five sums are the scores; softmax turns them into the percentages you saw on the previous page.</p>
+    <div class="mmWrap"><div class="mm" id="mm2"></div></div>
+    <div class="legend" id="legend"></div>
+    <p class="dims"><b>h</b> is 1×8, <b>W2</b> is 8×5, so <b>h · W2</b> is 1×5. Add <b>b2</b>, apply softmax, and the biggest of the five wins.</p>
+    <div class="ar" id="ar2"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">4</span>The shape rule</h2>
+    <p>Two matrices can only be multiplied when the <b>inner</b> numbers match: the columns of the left one equal the rows of the right one. The <b>outer</b> numbers tell you the shape of the answer. Try some shapes:</p>
+    <div class="shapeRow">
+      <div class="shapeBox"><div class="nm">A</div><select id="ar_"></select> × <select id="ac_"></select><div class="blocks" id="blA"></div></div>
+      <div class="times">·</div>
+      <div class="shapeBox"><div class="nm">B</div><select id="br_"></select> × <select id="bc_"></select><div class="blocks b" id="blB"></div></div>
+      <div class="arrow">=</div>
+      <div class="shapeBox res"><div class="nm">A · B</div><div id="resDims" class="dims" style="margin:0"></div><div class="blocks r" id="blR"></div></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="presets">
+      <button type="button" data-shape="1,2,2,8">x · W1</button>
+      <button type="button" data-shape="1,8,8,5">h · W2</button>
+      <button type="button" data-shape="2,8,1,2">W1 · x (backwards!)</button>
+      <button type="button" data-shape="3,3,3,3">3×3 · 3×3</button>
+    </div>
+  </div>
+
+  <div class="card quiz">
+    <h2><span class="step">5</span>You try it</h2>
+    <p>Compute one hidden neuron by hand: multiply the two pairs, add, add the bias, then ReLU. Two decimals is close enough.</p>
+    <div class="q" id="qText"></div>
+    <div class="ar" id="qAr"></div>
+    <div style="margin-top:10px">
+      <input type="text" id="qIn" inputmode="decimal" placeholder="h = ?" aria-label="Your answer">
+      <button class="primary" id="qCheck" type="button">Check</button>
+      <button id="qNew" type="button">Another one</button>
+    </div>
+    <div class="fb" id="qFb"></div>
+    <div class="streak" id="qStreak"></div>
+    <div class="hint" id="qHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>In code</h2>
+    <p>With NumPy, <code>@</code> means matrix multiply. The whole network is these two lines, and every number on this page is one cell of them:</p>
+    <div class="code"><span class="fn">h</span> <span class="op">=</span> relu(x <span class="op">@</span> W1 <span class="op">+</span> b1)        <span class="cm"># (1×2) @ (2×8) + (1×8)  →  (1×8)</span>
+<span class="fn">y</span> <span class="op">=</span> softmax(h <span class="op">@</span> W2 <span class="op">+</span> b2)     <span class="cm"># (1×8) @ (8×5) + (1×5)  →  (1×5)</span></div>
+    <p class="note">Training never changes these two lines. It only changes the 56 numbers inside W1 and W2 (and the 13 biases), which is why the previous page could learn the rules without anyone writing them down.</p>
+  </div>
+
+  <nav class="series bottom" aria-label="Neural network demo series"><a href="https://professor-jeff.github.io/pick-activity/" title="Previous demo in the series">← Previous: Pick Activity</a><span>Part 3 of 6 · neural network demos</span><a href="https://professor-jeff.github.io/tictactoe-nn/" title="Next demo in the series">Next: Tic-Tac-Toe →</a></nav>
+</div>
+
+<button id="qrBtn" type="button" aria-expanded="false" aria-controls="qrPanel">Show QR code</button>
+<div id="qrPanel" role="dialog" aria-label="QR code for this page">
+  <div class="qrTitle">Scan to try it</div>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33" shape-rendering="crispEdges" role="img" aria-label="QR code for https://professor-jeff.github.io/matrix-multiply/"><rect width="33" height="33" fill="#fff"/><path fill="#000" d="M0 0h7v1h-7zM8 0h2v1h-2zM11 0h1v1h-1zM18 0h3v1h-3zM22 0h2v1h-2zM26 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM11 1h2v1h-2zM14 1h1v1h-1zM17 1h1v1h-1zM20 1h1v1h-1zM23 1h2v1h-2zM26 1h1v1h-1zM32 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM9 2h2v1h-2zM12 2h5v1h-5zM18 2h1v1h-1zM20 2h1v1h-1zM24 2h1v1h-1zM26 2h1v1h-1zM28 2h3v1h-3zM32 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM8 3h2v1h-2zM11 3h1v1h-1zM15 3h1v1h-1zM18 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM26 3h1v1h-1zM28 3h3v1h-3zM32 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM10 4h1v1h-1zM13 4h1v1h-1zM16 4h3v1h-3zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h1v1h-1zM28 4h3v1h-3zM32 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM10 5h2v1h-2zM14 5h5v1h-5zM21 5h2v1h-2zM26 5h1v1h-1zM32 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h7v1h-7zM8 7h3v1h-3zM14 7h4v1h-4zM19 7h1v1h-1zM22 7h3v1h-3zM0 8h1v1h-1zM2 8h2v1h-2zM5 8h3v1h-3zM10 8h3v1h-3zM14 8h4v1h-4zM21 8h1v1h-1zM26 8h1v1h-1zM29 8h1v1h-1zM31 8h2v1h-2zM0 9h1v1h-1zM2 9h3v1h-3zM7 9h1v1h-1zM9 9h3v1h-3zM13 9h1v1h-1zM16 9h8v1h-8zM26 9h2v1h-2zM29 9h2v1h-2zM32 9h1v1h-1zM0 10h1v1h-1zM2 10h2v1h-2zM6 10h1v1h-1zM8 10h6v1h-6zM16 10h1v1h-1zM18 10h1v1h-1zM23 10h1v1h-1zM27 10h3v1h-3zM31 10h2v1h-2zM2 11h1v1h-1zM4 11h1v1h-1zM8 11h1v1h-1zM10 11h1v1h-1zM12 11h1v1h-1zM17 11h1v1h-1zM19 11h2v1h-2zM22 11h4v1h-4zM27 11h1v1h-1zM29 11h1v1h-1zM32 11h1v1h-1zM2 12h1v1h-1zM5 12h2v1h-2zM8 12h1v1h-1zM10 12h1v1h-1zM14 12h3v1h-3zM20 12h1v1h-1zM22 12h1v1h-1zM28 12h2v1h-2zM31 12h2v1h-2zM0 13h1v1h-1zM2 13h1v1h-1zM4 13h2v1h-2zM7 13h1v1h-1zM14 13h1v1h-1zM20 13h1v1h-1zM24 13h1v1h-1zM27 13h1v1h-1zM30 13h2v1h-2zM1 14h1v1h-1zM5 14h2v1h-2zM11 14h1v1h-1zM17 14h6v1h-6zM26 14h4v1h-4zM0 15h5v1h-5zM7 15h3v1h-3zM11 15h5v1h-5zM18 15h1v1h-1zM21 15h2v1h-2zM25 15h6v1h-6zM1 16h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM9 16h1v1h-1zM13 16h2v1h-2zM16 16h1v1h-1zM18 16h1v1h-1zM20 16h3v1h-3zM25 16h2v1h-2zM28 16h3v1h-3zM4 17h2v1h-2zM9 17h2v1h-2zM12 17h2v1h-2zM15 17h1v1h-1zM20 17h5v1h-5zM26 17h1v1h-1zM28 17h2v1h-2zM31 17h2v1h-2zM2 18h2v1h-2zM6 18h3v1h-3zM10 18h2v1h-2zM13 18h1v1h-1zM15 18h1v1h-1zM18 18h1v1h-1zM21 18h2v1h-2zM25 18h4v1h-4zM30 18h1v1h-1zM1 19h2v1h-2zM8 19h1v1h-1zM10 19h1v1h-1zM12 19h2v1h-2zM17 19h4v1h-4zM24 19h3v1h-3zM28 19h1v1h-1zM31 19h1v1h-1zM0 20h1v1h-1zM6 20h2v1h-2zM10 20h3v1h-3zM15 20h2v1h-2zM21 20h1v1h-1zM23 20h1v1h-1zM29 20h2v1h-2zM32 20h1v1h-1zM0 21h1v1h-1zM2 21h1v1h-1zM4 21h2v1h-2zM8 21h1v1h-1zM13 21h4v1h-4zM20 21h1v1h-1zM22 21h2v1h-2zM26 21h1v1h-1zM30 21h1v1h-1zM32 21h1v1h-1zM2 22h2v1h-2zM5 22h4v1h-4zM11 22h1v1h-1zM13 22h1v1h-1zM15 22h1v1h-1zM18 22h7v1h-7zM26 22h1v1h-1zM28 22h1v1h-1zM31 22h2v1h-2zM1 23h1v1h-1zM3 23h2v1h-2zM7 23h2v1h-2zM13 23h1v1h-1zM15 23h1v1h-1zM18 23h1v1h-1zM20 23h1v1h-1zM24 23h2v1h-2zM28 23h2v1h-2zM0 24h1v1h-1zM3 24h1v1h-1zM6 24h1v1h-1zM10 24h3v1h-3zM14 24h1v1h-1zM17 24h1v1h-1zM19 24h1v1h-1zM22 24h1v1h-1zM24 24h6v1h-6zM8 25h6v1h-6zM15 25h2v1h-2zM19 25h1v1h-1zM21 25h4v1h-4zM28 25h2v1h-2zM0 26h7v1h-7zM8 26h1v1h-1zM12 26h2v1h-2zM16 26h5v1h-5zM22 26h3v1h-3zM26 26h1v1h-1zM28 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM8 27h1v1h-1zM10 27h1v1h-1zM12 27h1v1h-1zM15 27h4v1h-4zM20 27h5v1h-5zM28 27h4v1h-4zM0 28h1v1h-1zM2 28h3v1h-3zM6 28h1v1h-1zM9 28h1v1h-1zM13 28h1v1h-1zM16 28h6v1h-6zM23 28h6v1h-6zM30 28h1v1h-1zM0 29h1v1h-1zM2 29h3v1h-3zM6 29h1v1h-1zM8 29h1v1h-1zM10 29h2v1h-2zM14 29h1v1h-1zM16 29h2v1h-2zM19 29h1v1h-1zM22 29h1v1h-1zM24 29h1v1h-1zM27 29h1v1h-1zM29 29h1v1h-1zM32 29h1v1h-1zM0 30h1v1h-1zM2 30h3v1h-3zM6 30h1v1h-1zM8 30h3v1h-3zM15 30h2v1h-2zM18 30h1v1h-1zM20 30h1v1h-1zM24 30h4v1h-4zM30 30h1v1h-1zM0 31h1v1h-1zM6 31h1v1h-1zM11 31h2v1h-2zM14 31h1v1h-1zM17 31h3v1h-3zM24 31h2v1h-2zM27 31h2v1h-2zM32 31h1v1h-1zM0 32h7v1h-7zM8 32h3v1h-3zM13 32h2v1h-2zM17 32h2v1h-2zM21 32h3v1h-3zM28 32h3v1h-3z"/></svg>
+  <div class="qrUrl">professor-jeff.github.io/matrix-multiply</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ACTIVITIES = ["play volleyball", "see a movie", "go running", "try yoga", "read a book"];
+const N_IN = 2, N_HID = 8, N_OUT = 5;
+const SUB = "₀₁₂₃₄₅₆₇₈₉";
+const sub = n => String(n).replace(/\d/g, d => SUB[d]);
+const relu = z => Math.max(0, z);
+function softmax(z) { const m = Math.max(...z); const e = z.map(v => Math.exp(v - m)); const s = e.reduce((a, b) => a + b, 0); return e.map(v => v / s); }
+const r2 = v => Math.round(v * 100) / 100;                 // the two-decimal number the student sees
+const fs = v => (v < 0 ? "−" : "+") + Math.abs(v).toFixed(2);   // signed
+const fu = v => v.toFixed(2);                                   // unsigned
+
+// A network trained on the previous page (99.4% on unseen examples), used when none is saved in this browser.
+const BAKED = {"W1":[[-0.993,-5.219,8.186,-5.152,-2.439,4.627,1.817,-0.473],[0.094,2.546,-0.5,-1.847,0.489,1.932,6.119,0.159]],"b1":[0.024,4.338,-1.232,6.275,2.191,0.545,-3.52,-0.149],"W2":[[-0.062,-0.465,0.121,-0.119,-0.022],[-4.674,-3.241,-0.619,2.728,3.797],[4.01,2.72,0.95,-1.369,-6.488],[-2.973,-5.504,3.168,-0.626,4.681],[-1.633,-0.937,0.625,0.795,2.658],[0.315,0.371,0.402,1.596,-5.338],[-2.852,3.226,-4.482,1.422,3.633],[0.41,0.166,1.311,-0.03,-0.708]],"b2":[-0.6,-0.621,0.758,0.075,0.388]};
+
+// The previous page saves its trained weights under this key; all pages share the same origin.
+function loadParams() {
+  try {
+    const p = JSON.parse(localStorage.getItem("pick-activity-params"));
+    const okShape = p && p.W1 && p.W1.length === N_IN && p.W1[0].length === N_HID && p.W2 && p.W2.length === N_HID && p.W2[0].length === N_OUT && p.b1 && p.b2;
+    if (okShape) return { p, from: "part2", acc: p.acc, when: p.savedAt };
+  } catch (e) {}
+  return { p: BAKED, from: "baked" };
+}
+const loaded = loadParams();
+const P = loaded.p;
+$("src").className = "src" + (loaded.from === "baked" ? " baked" : "");
+$("src").innerHTML = loaded.from === "part2"
+  ? `<b>Weights:</b> the 56 you trained on <a href="https://professor-jeff.github.io/pick-activity/">Pick Activity</a>${loaded.acc != null ? ` (${(loaded.acc).toFixed(1)}% correct on unseen examples)` : ""}. Same numbers, same names.`
+  : `<b>Weights:</b> a saved network trained on <a href="https://professor-jeff.github.io/pick-activity/">Pick Activity</a> (99.4% correct). Train your own there and come back, and this page will use yours.`;
+
+function forward(x) {
+  const z1 = [], a1 = [];
+  for (let j = 0; j < N_HID; j++) { let s = P.b1[j]; for (let i = 0; i < N_IN; i++) s += x[i] * P.W1[i][j]; z1.push(s); a1.push(relu(s)); }
+  const z2 = [];
+  for (let k = 0; k < N_OUT; k++) { let s = P.b2[k]; for (let j = 0; j < N_HID; j++) s += a1[j] * P.W2[j][k]; z2.push(s); }
+  return { z1, a1, z2, probs: softmax(z2) };
+}
+
+let selJ = null, selK = null;     // which column the student picked in each layer (null = follow the winner)
+
+function state() {
+  const temp = +$("temp").value, rain = +$("rain").value;
+  const x = [temp / 100, rain / 100];
+  const f = forward(x);
+  const best = f.probs.indexOf(Math.max(...f.probs));
+  const j = selJ ?? f.a1.indexOf(Math.max(...f.a1));
+  const k = selK ?? best;
+  return { temp, rain, x, f, best, j, k };
+}
+
+// --- step 1: one neuron, written out ------------------------------------------------------
+function renderStep1(s) {
+  const { x, f, j } = s;
+  $("chips").innerHTML = Array.from({ length: N_HID }, (_, q) => `<button type="button" data-j="${q}" class="${q === j ? "on" : ""}">h${sub(q + 1)}</button>`).join("");
+  const p1 = x[0] * P.W1[0][j], p2 = x[1] * P.W1[1][j];
+  const dead = f.z1[j] < 0;
+  $("ar1").innerHTML =
+    `<span class="k">x${sub(1)} × W1[1,${j + 1}]</span><span class="eq">=</span><span>${fu(x[0])} × (${fs(P.W1[0][j])})</span><span class="eq">=</span><span class="r">${fs(p1)}</span>` +
+    `<span class="k">x${sub(2)} × W1[2,${j + 1}]</span><span class="eq">=</span><span>${fu(x[1])} × (${fs(P.W1[1][j])})</span><span class="eq">=</span><span class="r">${fs(p2)}</span>` +
+    `<span class="k">bias b1[${j + 1}]</span><span class="eq"></span><span></span><span class="eq"></span><span class="r">${fs(P.b1[j])}</span>` +
+    `<span class="rule"></span>` +
+    `<span class="k">add them up</span><span class="eq">=</span><span>${fs(p1)} ${fs(p2)} ${fs(P.b1[j])}</span><span class="eq">=</span><span class="r">${fs(f.z1[j])}</span>` +
+    `<span class="k">ReLU</span><span class="eq">=</span><span>${dead ? "negative, so 0" : "positive, so keep it"}</span><span class="eq">=</span><span class="r ${dead ? "zero" : "final"}">${fu(f.a1[j])}</span>` +
+    `<span class="k final" style="font-weight:700">h${sub(j + 1)}</span><span class="eq">=</span><span></span><span class="eq"></span><span class="r final">${fu(f.a1[j])}</span>`;
+  $("ar1Note").innerHTML = `That is one <b>dot product</b>: the row x against column ${j + 1} of W1. Two pairs, two products, one sum. Move the sliders and watch the products change; pick a different neuron and only the weights change.`;
+}
+
+// --- step 2: layer 1 stacked ---------------------------------------------------------------
+function cell(txt, cls, data) { return `<span class="c ${cls}"${data ? ` data-${data}` : ""}>${txt}</span>`; }
+function renderStep2(s) {
+  const { x, f, j } = s;
+  let h = "";
+  const col = q => `c${q}`;
+  // header row: blank, "x", h1..h8
+  h += `<span class="l"></span><span class="hd">x</span>` + Array.from({ length: N_HID }, (_, q) => `<span class="hd pick ${q === j ? "sel" : ""}" data-j="${q}">h${sub(q + 1)}</span>`).join("");
+  for (let i = 0; i < N_IN; i++) {
+    h += `<span class="l">x${sub(i + 1)}</span>` + cell(fu(x[i]), "vec" + (true ? " sel" : ""), null);
+    for (let q = 0; q < N_HID; q++) h += cell(fs(P.W1[i][q]), "pick" + (q === j ? " sel" : ""), `j="${q}"`);
+  }
+  h += `<span class="l">b1</span>` + cell("", "blank");
+  for (let q = 0; q < N_HID; q++) h += cell(fs(P.b1[q]), "pick" + (q === j ? " sel" : ""), `j="${q}"`);
+  h += `<span class="l">sum</span>` + cell("", "blank");
+  for (let q = 0; q < N_HID; q++) h += cell(fs(f.z1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}"`);
+  h += `<span class="l">ReLU</span>` + cell("", "blank");
+  for (let q = 0; q < N_HID; q++) h += cell(fu(f.a1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}"`);
+  $("mm1").style.gridTemplateColumns = `max-content repeat(${N_HID + 1}, 1fr)`;
+  $("mm1").innerHTML = h;
+}
+
+// --- step 3: layer 2 stacked ---------------------------------------------------------------
+function renderStep3(s) {
+  const { f, k, best } = s;
+  let h = "";
+  h += `<span class="l"></span><span class="hd">h</span>` + Array.from({ length: N_OUT }, (_, q) => `<span class="hd pick ${q === k ? "sel" : ""}" data-k="${q}">y${sub(q + 1)}</span>`).join("");
+  for (let j = 0; j < N_HID; j++) {
+    h += `<span class="l">h${sub(j + 1)}</span>` + cell(fu(f.a1[j]), "vec sel", null);
+    for (let q = 0; q < N_OUT; q++) h += cell(fs(P.W2[j][q]), "pick" + (q === k ? " sel" : ""), `k="${q}"`);
+  }
+  h += `<span class="l">b2</span>` + cell("", "blank");
+  for (let q = 0; q < N_OUT; q++) h += cell(fs(P.b2[q]), "pick" + (q === k ? " sel" : ""), `k="${q}"`);
+  h += `<span class="l">score</span>` + cell("", "blank");
+  for (let q = 0; q < N_OUT; q++) h += cell(fs(f.z2[q]), "pick out" + (q === k ? " sel" : ""), `k="${q}"`);
+  h += `<span class="l">softmax</span>` + cell("", "blank");
+  for (let q = 0; q < N_OUT; q++) h += cell(Math.round(f.probs[q] * 100) + "%", "pick out" + (q === k ? " sel" : "") + (q === best ? " win" : ""), `k="${q}"`);
+  $("mm2").style.gridTemplateColumns = `max-content repeat(${N_OUT + 1}, 1fr)`;
+  $("mm2").innerHTML = h;
+  $("legend").innerHTML = ACTIVITIES.map((a, q) => `<b${q === best ? ' class="w"' : ""}>y${sub(q + 1)}</b> ${a}${q === best ? " ✓" : ""}`).join(" · ");
+
+  // the arithmetic for the picked column: eight products, one sum
+  let a = `<span class="k" style="grid-column:1/-1;font-family:inherit">Column ${k + 1} (y${sub(k + 1)}, ${ACTIVITIES[k]}), by hand:</span>`;
+  let terms = [];
+  for (let j = 0; j < N_HID; j++) {
+    const p = f.a1[j] * P.W2[j][k];
+    terms.push(fs(p));
+    a += `<span class="k">h${sub(j + 1)} × W2[${j + 1},${k + 1}]</span><span class="eq">=</span><span>${fu(f.a1[j])} × (${fs(P.W2[j][k])})</span><span class="eq">=</span><span class="r">${fs(p)}</span>`;
+  }
+  a += `<span class="k">bias b2[${k + 1}]</span><span class="eq"></span><span></span><span class="eq"></span><span class="r">${fs(P.b2[k])}</span>`;
+  a += `<span class="rule"></span>`;
+  a += `<span class="k">add them up</span><span class="eq">=</span><span>score for y${sub(k + 1)}</span><span class="eq">=</span><span class="r final">${fs(f.z2[k])}</span>`;
+  a += `<span class="k">softmax</span><span class="eq">=</span><span>share of the five scores</span><span class="eq">=</span><span class="r final">${Math.round(f.probs[k] * 100)}%</span>`;
+  $("ar2").innerHTML = a;
+}
+
+// --- step 4: shape rule ---------------------------------------------------------------------
+function blocks(el, rows, cols, bad) {
+  el.className = el.className.replace(" bad", "") + (bad ? " bad" : "");
+  el.style.gridTemplateColumns = `repeat(${cols}, 14px)`;
+  el.innerHTML = Array.from({ length: rows * cols }, () => "<span></span>").join("");
+}
+function renderShapes() {
+  const ar = +$("ar_").value, ac = +$("ac_").value, br = +$("br_").value, bc = +$("bc_").value;
+  const ok = ac === br;
+  blocks($("blA"), ar, ac, false); blocks($("blB"), br, bc, false);
+  if (ok) {
+    blocks($("blR"), ar, bc, false);
+    $("resDims").innerHTML = `<b>${ar}×${bc}</b>`;
+    $("verdict").className = "verdict ok";
+    $("verdict").textContent = `✓ Inner numbers match (${ac} = ${br}). The answer is ${ar}×${bc}: each of its ${ar * bc} cells is a sum of ${ac} products.`;
+  } else {
+    $("blR").innerHTML = ""; $("blR").style.gridTemplateColumns = "";
+    $("resDims").innerHTML = `<b>—</b>`;
+    $("verdict").className = "verdict no";
+    $("verdict").textContent = `✗ Can't multiply: A has ${ac} columns but B has ${br} rows, so the pairs don't line up.`;
+  }
+}
+
+// --- step 5: you try it ----------------------------------------------------------------------
+let quizJ = 2, streak = 0, tries = 0;
+function quizExpected(s) {   // computed from the rounded numbers the student is looking at
+  const j = quizJ, x = s.x;
+  return relu(r2(x[0]) * r2(P.W1[0][j]) + r2(x[1]) * r2(P.W1[1][j]) + r2(P.b1[j]));
+}
+function renderQuiz(s) {
+  const j = quizJ, x = s.x;
+  $("qText").innerHTML = `What is <b>h${sub(j + 1)}</b> right now?`;
+  $("qAr").innerHTML =
+    `<span class="k">x${sub(1)}</span><span class="eq">=</span><span class="r">${fu(x[0])}</span><span class="k">W1[1,${j + 1}]</span><span class="r">${fs(P.W1[0][j])}</span>` +
+    `<span class="k">x${sub(2)}</span><span class="eq">=</span><span class="r">${fu(x[1])}</span><span class="k">W1[2,${j + 1}]</span><span class="r">${fs(P.W1[1][j])}</span>` +
+    `<span class="k">b1[${j + 1}]</span><span class="eq">=</span><span class="r">${fs(P.b1[j])}</span><span></span><span></span>`;
+  $("qStreak").textContent = streak ? `Streak: ${streak} ✓` : "";
+}
+function newQuiz() {
+  let j; do { j = Math.floor(Math.random() * N_HID); } while (j === quizJ);
+  quizJ = j; tries = 0;
+  $("qIn").value = ""; $("qFb").textContent = ""; $("qFb").className = "fb"; $("qHint").textContent = "";
+  renderQuiz(state()); $("qIn").focus();
+}
+function checkQuiz() {
+  const s = state();
+  const raw = $("qIn").value.trim().replace("−", "-").replace(",", ".");
+  if (raw === "" || isNaN(+raw)) { $("qFb").className = "fb no"; $("qFb").textContent = "Type a number (two decimals is fine)."; return; }
+  const ans = +raw, want = quizExpected(s);
+  tries++;
+  if (Math.abs(ans - want) <= 0.02) {
+    streak++;
+    $("qFb").className = "fb ok";
+    $("qFb").textContent = streak >= 3 ? `✓ Correct: h${sub(quizJ + 1)} = ${fu(want)}. Three in a row — you just did matrix multiplication by hand. 🎉` : `✓ Correct: h${sub(quizJ + 1)} = ${fu(want)}.`;
+    $("qHint").textContent = "";
+  } else {
+    streak = 0;
+    const z = r2(s.x[0]) * r2(P.W1[0][quizJ]) + r2(s.x[1]) * r2(P.W1[1][quizJ]) + r2(P.b1[quizJ]);
+    $("qFb").className = "fb no";
+    $("qFb").textContent = `✗ Not quite. You said ${fu(ans)}.`;
+    $("qHint").innerHTML = tries === 1
+      ? "Multiply each pair (x₁ with W1[1,j], x₂ with W1[2,j]), add the two products, add the bias, then ReLU: if the sum is negative the answer is 0."
+      : `Before ReLU the sum is ${fs(z)}. ${z < 0 ? "That is negative, so ReLU makes it <b>0</b>." : "That is positive, so ReLU keeps it."}`;
+  }
+  $("qStreak").textContent = streak ? `Streak: ${streak} ✓` : "";
+}
+
+// --- wire it all up ---------------------------------------------------------------------------
+function render() {
+  const s = state();
+  $("tempVal").textContent = `${s.temp} °F`; $("rainVal").textContent = `${s.rain} %`;
+  renderStep1(s); renderStep2(s); renderStep3(s); renderQuiz(s);
+}
+$("temp").addEventListener("input", render);
+$("rain").addEventListener("input", render);
+$("chips").addEventListener("click", e => { const b = e.target.closest("[data-j]"); if (b) { selJ = +b.dataset.j; render(); } });
+$("mm1").addEventListener("click", e => { const c = e.target.closest("[data-j]"); if (c) { selJ = +c.dataset.j; render(); } });
+$("mm2").addEventListener("click", e => { const c = e.target.closest("[data-k]"); if (c) { selK = +c.dataset.k; render(); } });
+
+for (const id of ["ar_", "ac_", "br_", "bc_"]) {
+  $(id).innerHTML = Array.from({ length: 9 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
+  $(id).addEventListener("change", renderShapes);
+}
+document.querySelector(".presets").addEventListener("click", e => {
+  const b = e.target.closest("[data-shape]"); if (!b) return;
+  const [ar, ac, br, bc] = b.dataset.shape.split(",");
+  $("ar_").value = ar; $("ac_").value = ac; $("br_").value = br; $("bc_").value = bc; renderShapes();
+});
+$("ar_").value = 1; $("ac_").value = 2; $("br_").value = 2; $("bc_").value = 8;
+renderShapes();
+
+$("qCheck").addEventListener("click", checkQuiz);
+$("qIn").addEventListener("keydown", e => { if (e.key === "Enter") checkQuiz(); });
+$("qNew").addEventListener("click", newQuiz);
+
+render();
+
+// QR code toggle so students can find this page during a presentation
+const qrBtn = $("qrBtn"), qrPanel = $("qrPanel");
+function setQr(open) {
+  qrPanel.classList.toggle("open", open);
+  qrBtn.textContent = open ? "Hide QR code" : "Show QR code";
+  qrBtn.setAttribute("aria-expanded", String(open));
+}
+qrBtn.addEventListener("click", () => setQr(!qrPanel.classList.contains("open")));
+document.addEventListener("keydown", e => { if (e.key === "Escape") setQr(false); });
+</script>
+</body>
+</html>
