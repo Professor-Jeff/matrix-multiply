@@ -178,7 +178,7 @@
         <input type="range" id="rain" min="0" max="100" value="20">
       </div>
     </div>
-    <p class="note" style="margin:0 0 8px">The sliders become the two inputs, scaled to 0–1: <b>x₁ = temperature ÷ 100</b> and <b>x₂ = rain ÷ 100</b>. Together they are a matrix with 1 row and 2 columns, written <b>x</b>.</p>
+    <p class="note" style="margin:0 0 8px">The sliders become the two inputs, scaled to 0–1: <b>x₁ = temperature ÷ 100</b> and <b>x₂ = rain ÷ 100</b>. Together they are a matrix with 1 row and 2 columns, written <b>x</b>. Move the sliders and every number below recomputes. The highlighted column starts on the neuron that fires hardest and the activity that wins; tap any column to follow a different one instead, and tap it again to let go.</p>
     <div class="src" id="src"></div>
   </div>
 
@@ -547,9 +547,11 @@ function render() {
 }
 $("temp").addEventListener("input", render);
 $("rain").addEventListener("input", render);
-$("chips").addEventListener("click", e => { const b = e.target.closest("[data-j]"); if (b) { selJ = +b.dataset.j; render(); } });
-$("mm1").addEventListener("click", e => { const c = e.target.closest("[data-j]"); if (c) { selJ = +c.dataset.j; render(); } });
-$("mm2").addEventListener("click", e => { const c = e.target.closest("[data-k]"); if (c) { selK = +c.dataset.k; render(); } });
+const pickJ = j => { selJ = selJ === j ? null : j; render(); };
+const pickK = k => { selK = selK === k ? null : k; render(); };
+$("chips").addEventListener("click", e => { const b = e.target.closest("[data-j]"); if (b) pickJ(+b.dataset.j); });
+$("mm1").addEventListener("click", e => { const c = e.target.closest("[data-j]"); if (c) pickJ(+c.dataset.j); });
+$("mm2").addEventListener("click", e => { const c = e.target.closest("[data-k]"); if (c) pickK(+c.dataset.k); });
 
 for (const id of ["ar_", "ac_", "br_", "bc_"]) {
   $(id).innerHTML = Array.from({ length: 9 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
