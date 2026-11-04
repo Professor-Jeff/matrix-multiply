@@ -96,6 +96,15 @@
   .blocks.b span { background: #fde68a; }
   .blocks.r span { background: #bbf7d0; }
   .blocks.bad span { background: #fecaca; }
+  .blocks span.on { outline: 2px solid var(--accent); outline-offset: -1px; background: #60a5fa; }
+  .blocks.w span.on { background: #f59e0b; }
+  .blocks.r span.on { background: #4ade80; }
+  .blocks span.feed { outline: 2px dashed var(--accent); outline-offset: -1px; }
+  .blocks span.onk { outline: 2px solid var(--ok); outline-offset: -1px; }
+  .blocks.w span.onk { background: #fbbf24; }
+  .blocks.r span.onk { background: #4ade80; }
+  .castNote { font-size: .85rem; color: var(--muted); margin: 8px 0 0; line-height: 1.5; min-height: 1.5em; }
+  .castNote b { color: var(--ink); }
   .verdict { margin-top: 8px; font-weight: 600; min-height: 1.5em; }
   .verdict.ok { color: var(--ok); }
   .verdict.no { color: var(--bad); }
@@ -158,6 +167,7 @@
     <h2>The cast</h2>
     <p>Five matrices, drawn to scale, one square per number. <span class="sw x">blue</span> is the vector going in, <span class="sw w">yellow</span> is weights the network learned, <span class="sw r">green</span> is what comes out. Notice that each block is exactly as wide as the next one is tall: that is what lets them be multiplied in this order.</p>
     <div class="cast" id="cast"></div>
+    <p class="castNote" id="castNote"></p>
     <p class="note">The biases <b>b1</b> (1×8) and <b>b2</b> (1×5) are added after each multiplication; they are rows the same width as the result. Altogether: 16 + 40 = 56 weights and 13 biases, and the network is nothing but these numbers.</p>
   </div>
 
@@ -428,6 +438,20 @@ function renderCast() {
   blocks($("cast_x"), 1, 2); blocks($("cast_W1"), 2, 8); blocks($("cast_h"), 1, 8); blocks($("cast_W2"), 8, 5); blocks($("cast_y"), 1, 5);
 }
 renderCast();
+function litCast(j, k) {
+  const sq = (id, r, c, cols) => $(id).children[r * cols + c];
+  document.querySelectorAll("#cast .blocks span").forEach(e => e.classList.remove("on", "feed", "onk"));
+  // hidden neuron j: both x squares, column j of W1, square j of h, and the W2 row that h_j multiplies next
+  sq("cast_x", 0, 0, 2).classList.add("on"); sq("cast_x", 0, 1, 2).classList.add("on");
+  for (let i = 0; i < N_IN; i++) sq("cast_W1", i, j, N_HID).classList.add("on");
+  sq("cast_h", 0, j, N_HID).classList.add("on");
+  for (let q = 0; q < N_OUT; q++) sq("cast_W2", j, q, N_OUT).classList.add("feed");
+  // output k: column k of W2 and square k of y
+  for (let r = 0; r < N_HID; r++) sq("cast_W2", r, k, N_OUT).classList.add("onk");
+  sq("cast_y", 0, k, N_OUT).classList.add("onk");
+  $("castNote").innerHTML = `<b>h${sub(j + 1)}</b> (steps 1–2) is x times <b>column ${j + 1} of W1</b>, landing in <b>square ${j + 1} of h</b>; from there it multiplies the dashed <b>row ${j + 1} of W2</b>. ` +
+    `<b>y${sub(k + 1)}</b> (step 3) is h times the green <b>column ${k + 1} of W2</b>, landing in <b>square ${k + 1} of y</b>.`;
+}
 
 // --- step 5: you try it ----------------------------------------------------------------------
 let quizJ = 2, streak = 0, tries = 0;
@@ -477,7 +501,7 @@ function checkQuiz() {
 function render() {
   const s = state();
   $("tempVal").textContent = `${s.temp} °F`; $("rainVal").textContent = `${s.rain} %`;
-  renderStep1(s); renderStep2(s); renderStep3(s); renderQuiz(s);
+  renderStep1(s); renderStep2(s); renderStep3(s); renderQuiz(s); litCast(s.j, s.k);
 }
 $("temp").addEventListener("input", render);
 $("rain").addEventListener("input", render);
