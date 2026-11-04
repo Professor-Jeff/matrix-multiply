@@ -33,7 +33,20 @@
 
   /* stacked matrices: the vector down the left, the matrix beside it, results underneath */
   .mmWrap { overflow-x: auto; margin: 6px -4px; padding: 0 4px; }
-  .mm { display: grid; gap: 3px; font-family: ui-monospace, Menlo, monospace; font-size: clamp(.56rem, 2.4vw, .8rem); margin: 6px 0; }
+  .mm { display: grid; gap: 3px; font-family: ui-monospace, Menlo, monospace; font-size: clamp(.56rem, 2.4vw, .8rem); margin: 6px 0; position: relative; padding-right: 132px; }
+  .mm .box { position: absolute; border: 2px solid; border-radius: 7px; pointer-events: none; }
+  .mm .box.x { border-color: #60a5fa; } .mm .box.w { border-color: #f59e0b; } .mm .box.z { border-color: #9ca3af; border-style: dashed; } .mm .box.r { border-color: #22c55e; }
+  .mm .box .tag { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); white-space: nowrap; font-family: system-ui, sans-serif; }
+  .mm .box .tag .sw { font-size: .78rem; }
+  .mm .box .tag .dim { color: var(--muted); font-size: .75rem; margin-left: 4px; }
+  .mm .box .tag .short { display: none; }
+  .mm .hd .sw { font-size: .72rem; padding: 0 5px; }
+  @media (max-width: 480px) {
+    .mm { padding-right: 0; }
+    .mm .box .tag { left: auto; right: -2px; top: -10px; transform: none; }
+    .mm .box .tag .sw { font-size: .6rem; padding: 0 4px; } .mm .box .tag .dim { display: none; }
+    .mm .box .tag .long { display: none; } .mm .box .tag .short { display: inline; }
+  }
   .mm .c { background: var(--bg); padding: 5px 1px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; border: 1px solid transparent; min-width: 26px; white-space: nowrap; }
   @media (max-width: 480px) { .mm { gap: 2px; } .mm .l { font-size: .62rem; padding-right: 3px; } .mm .hd { font-size: .62rem; } }
   .mm .c.pick { cursor: pointer; }
@@ -51,6 +64,7 @@
   .mm .c.w { background: #fefce8; }
   .dims { font-size: .85rem; color: var(--muted); margin: 8px 0 0; font-variant-numeric: tabular-nums; }
   .sw { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 700; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; }
+  .sw { background: var(--bg); color: var(--muted); }
   .sw.x { background: #dbeafe; color: #1e3a8a; } .sw.w { background: #fef3c7; color: #78350f; } .sw.r { background: #dcfce7; color: #14532d; }
   .shapeLine { font-size: .9rem; color: var(--muted); margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
   .shapeLine .d { color: var(--ink); }
@@ -325,38 +339,61 @@ function renderStep2(s) {
   let h = "";
   const col = q => `c${q}`;
   // header row: blank, "x", h1..h8
-  h += `<span class="l"></span><span class="hd">x</span>` + Array.from({ length: N_HID }, (_, q) => `<span class="hd pick ${q === j ? "sel" : ""}" data-j="${q}">h${sub(q + 1)}</span>`).join("");
+  h += `<span class="l"></span><span class="hd"><span class="sw x">x</span></span>` + Array.from({ length: N_HID }, (_, q) => `<span class="hd pick ${q === j ? "sel" : ""}" data-j="${q}">h${sub(q + 1)}</span>`).join("");
   for (let i = 0; i < N_IN; i++) {
-    h += `<span class="l">x${sub(i + 1)}</span>` + cell(fu(x[i]), "vec" + (true ? " sel" : ""), null);
-    for (let q = 0; q < N_HID; q++) h += cell(fs(P.W1[i][q]), "pick w" + (q === j ? " sel" : ""), `j="${q}"`);
+    h += `<span class="l">x${sub(i + 1)}</span>` + cell(fu(x[i]), "vec", `g="x"`);
+    for (let q = 0; q < N_HID; q++) h += cell(fs(P.W1[i][q]), "pick w" + (q === j ? " sel" : ""), `j="${q}" data-g="W1"`);
   }
   h += `<span class="l">b1</span>` + cell("", "blank");
   for (let q = 0; q < N_HID; q++) h += cell(fs(P.b1[q]), "pick" + (q === j ? " sel" : ""), `j="${q}"`);
   h += `<span class="l">sum</span>` + cell("", "blank");
-  for (let q = 0; q < N_HID; q++) h += cell(fs(f.z1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}"`);
+  for (let q = 0; q < N_HID; q++) h += cell(fs(f.z1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}" data-g="z1"`);
   h += `<span class="l">ReLU</span>` + cell("", "blank");
-  for (let q = 0; q < N_HID; q++) h += cell(fu(f.a1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}"`);
+  for (let q = 0; q < N_HID; q++) h += cell(fu(f.a1[q]), "pick out" + (q === j ? " sel" : ""), `j="${q}" data-g="h"`);
   $("mm1").style.gridTemplateColumns = `max-content repeat(${N_HID + 1}, 1fr)`;
   $("mm1").innerHTML = h;
+  drawBoxes($("mm1"), [["x", "x", null], ["W1", "w", "W1|2×8"], ["z1", "z", "x·W1 + b1|1×8|sums"], ["h", "r", "h|1×8"]]);
 }
+
+// bounding boxes around each matrix in a grid, with a name-and-shape tag (to the right, or on the corner on phones)
+function drawBoxes(grid, groups) {
+  for (const [g, kind, tagSpec] of groups) {
+    const cells = grid.querySelectorAll(`[data-g="${g}"]`);
+    if (!cells.length) continue;
+    let l = 1e9, t = 1e9, r = 0, b = 0;
+    cells.forEach(c => { l = Math.min(l, c.offsetLeft); t = Math.min(t, c.offsetTop); r = Math.max(r, c.offsetLeft + c.offsetWidth); b = Math.max(b, c.offsetTop + c.offsetHeight); });
+    const pad = 3;
+    const box = document.createElement("div");
+    box.className = `box ${kind}`;
+    box.style.cssText = `left:${l - pad}px;top:${t - pad}px;width:${r - l + 2 * pad}px;height:${b - t + 2 * pad}px`;
+    if (tagSpec) {
+      const [name, dim, short] = tagSpec.split("|");
+      box.innerHTML = `<span class="tag"><span class="sw ${kind === "z" ? "" : kind}"><span class="long">${name}</span><span class="short">${short || name}</span></span><span class="dim">${dim}</span></span>`;
+    }
+    grid.appendChild(box);
+  }
+}
+let boxTimer = null;
+window.addEventListener("resize", () => { clearTimeout(boxTimer); boxTimer = setTimeout(render, 120); });
 
 // --- step 3: layer 2 stacked ---------------------------------------------------------------
 function renderStep3(s) {
   const { f, k, best } = s;
   let h = "";
-  h += `<span class="l"></span><span class="hd">h</span>` + Array.from({ length: N_OUT }, (_, q) => `<span class="hd pick ${q === k ? "sel" : ""}" data-k="${q}">y${sub(q + 1)}</span>`).join("");
+  h += `<span class="l"></span><span class="hd"><span class="sw x">h</span></span>` + Array.from({ length: N_OUT }, (_, q) => `<span class="hd pick ${q === k ? "sel" : ""}" data-k="${q}">y${sub(q + 1)}</span>`).join("");
   for (let j = 0; j < N_HID; j++) {
-    h += `<span class="l">h${sub(j + 1)}</span>` + cell(fu(f.a1[j]), "vec sel", null);
-    for (let q = 0; q < N_OUT; q++) h += cell(fs(P.W2[j][q]), "pick w" + (q === k ? " sel" : ""), `k="${q}"`);
+    h += `<span class="l">h${sub(j + 1)}</span>` + cell(fu(f.a1[j]), "vec", `g="h"`);
+    for (let q = 0; q < N_OUT; q++) h += cell(fs(P.W2[j][q]), "pick w" + (q === k ? " sel" : ""), `k="${q}" data-g="W2"`);
   }
   h += `<span class="l">b2</span>` + cell("", "blank");
   for (let q = 0; q < N_OUT; q++) h += cell(fs(P.b2[q]), "pick" + (q === k ? " sel" : ""), `k="${q}"`);
   h += `<span class="l">score</span>` + cell("", "blank");
-  for (let q = 0; q < N_OUT; q++) h += cell(fs(f.z2[q]), "pick out" + (q === k ? " sel" : ""), `k="${q}"`);
+  for (let q = 0; q < N_OUT; q++) h += cell(fs(f.z2[q]), "pick out" + (q === k ? " sel" : ""), `k="${q}" data-g="z2"`);
   h += `<span class="l">softmax</span>` + cell("", "blank");
-  for (let q = 0; q < N_OUT; q++) h += cell(Math.round(f.probs[q] * 100) + "%", "pick out" + (q === k ? " sel" : "") + (q === best ? " win" : ""), `k="${q}"`);
+  for (let q = 0; q < N_OUT; q++) h += cell(Math.round(f.probs[q] * 100) + "%", "pick out" + (q === k ? " sel" : "") + (q === best ? " win" : ""), `k="${q}" data-g="y"`);
   $("mm2").style.gridTemplateColumns = `max-content repeat(${N_OUT + 1}, 1fr)`;
   $("mm2").innerHTML = h;
+  drawBoxes($("mm2"), [["h", "x", null], ["W2", "w", "W2|8×5"], ["z2", "z", "h·W2 + b2|1×5|scores"], ["y", "r", "y|1×5"]]);
   $("legend").innerHTML = ACTIVITIES.map((a, q) => `<b${q === best ? ' class="w"' : ""}>y${sub(q + 1)}</b> ${a}${q === best ? " ✓" : ""}`).join(" · ");
 
   // the arithmetic for the picked column: eight products, one sum
