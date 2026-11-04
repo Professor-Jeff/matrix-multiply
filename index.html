@@ -282,7 +282,7 @@
     <div class="ar" id="q2Ar"></div>
     <div style="margin-top:10px">
       <input type="text" id="q2In" placeholder="the score, or the whole eight-term sum" aria-label="Your answer" autocomplete="off" spellcheck="false">
-      <div class="how">Same rules as step 5. Eight products is a lot to type, so <b>Start me off</b> writes the sum with the numbers in place; check it, change it, or just run it.</div>
+      <div class="how">Same rules as step 5. Eight products is a lot to type, so <b>Start me off</b> writes the sum with the h values in place and a <code>?</code> where each W2 value goes (the last <code>?</code> is the bias). Fill in the blanks from the list above and press Check.</div>
       <button class="primary" id="q2Check" type="button">Check</button>
       <button id="q2Fill" type="button">Start me off</button>
       <button id="q2New" type="button">Another one</button>
@@ -693,10 +693,10 @@ function renderQuiz2(s) {
   $("q2Ar").innerHTML = a;
   $("q2Streak").textContent = streak2 ? `Streak: ${streak2} ✓` : "";
 }
-function quiz2Template(s) {
-  const k = quizK, terms = [];
-  for (let j = 0; j < N_HID; j++) terms.push(`${fu(s.f.a1[j])}*(${fs(P.W2[j][k])})`);
-  return terms.join(" + ") + ` + (${fs(P.b2[k])})`;
+function quiz2Template(s) {   // the eight h values in place; each ? is a W2 value to look up, the last one the bias
+  const terms = [];
+  for (let j = 0; j < N_HID; j++) terms.push(`${fu(s.f.a1[j])}*(?)`);
+  return terms.join(" + ") + " + (?)";
 }
 function newQuiz2() {
   let k; do { k = Math.floor(Math.random() * N_OUT); } while (k === quizK);
@@ -708,6 +708,7 @@ function checkQuiz2() {
   const s = state();
   const raw = $("q2In").value.trim();
   if (raw === "") { $("q2Fb").className = "fb no"; $("q2Fb").textContent = "Type the score, or press Start me off and run the sum."; return; }
+  if (raw.includes("?")) { const n = (raw.match(/\?/g) || []).length; $("q2Fb").className = "fb no"; $("q2Fb").textContent = `${n} blank${n === 1 ? "" : "s"} left to fill: replace each ? with the W2 value next to that h, and the last one with the bias.`; return; }
   let ans;
   try { ans = evalExpr(raw); } catch (err) { $("q2Fb").className = "fb no"; $("q2Fb").textContent = `Couldn't read that: ${err.message}.`; return; }
   const want = quiz2Expected(s), k = quizK;
@@ -727,7 +728,7 @@ function checkQuiz2() {
     $("q2Fb").textContent = `✗ Not quite. You said ${fs(ans)}${shown}.`;
     $("q2Hint").innerHTML = tries2 === 1
       ? "Eight pairs: h₁ with W2[1,k], h₂ with W2[2,k], … then add all eight products and the bias. No ReLU this time; the score can be negative."
-      : `The first two products are ${fs(r2(s.f.a1[0]) * r2(P.W2[0][k]))} and ${fs(r2(s.f.a1[1]) * r2(P.W2[1][k]))}. Press Start me off to see the whole sum written out.`;
+      : `The first two products are ${fs(r2(s.f.a1[0]) * r2(P.W2[0][k]))} and ${fs(r2(s.f.a1[1]) * r2(P.W2[1][k]))}. Press Start me off for the skeleton, then fill in the blanks.`;
   }
   $("q2Streak").textContent = streak2 ? `Streak: ${streak2} ✓` : "";
 }
